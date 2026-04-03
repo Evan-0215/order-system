@@ -1,0 +1,3022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公司内部叫车系统</title>
+    <!-- Excel解析库 - CDN -->
+    <script src="https://unpkg.com/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <!-- CloudBase SDK v1.3.3 - CDN -->
+    <script src="https://unpkg.com/@cloudbase/js-sdk@1.3.3/cloudbase.full.js"></script>
+    <script>
+        window.cloudBaseLoaded = typeof cloudbase !== 'undefined';
+        window.cloudBaseLoadError = !window.cloudBaseLoaded;
+        if (window.cloudBaseLoaded) {
+            console.log('CloudBase SDK 加载成功（CDN）');
+        } else {
+            console.warn('CloudBase SDK 加载失败，将使用本地模式');
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        
+        /* 顶部导航 */
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #e8e8e8;
+            padding: 0 24px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 32px;
+        }
+        
+        .nav-tab {
+            padding: 16px 8px;
+            cursor: pointer;
+            color: #666;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .nav-tab:hover {
+            color: #1890ff;
+        }
+        
+        .nav-tab.active {
+            color: #1890ff;
+            border-bottom-color: #1890ff;
+        }
+        
+        /* 主内容区 */
+        .main-content {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* 表单区域 */
+        .form-section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .form-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 16px;
+        }
+        
+        .form-label {
+            min-width: 120px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .form-control {
+            flex: 1;
+            max-width: 400px;
+        }
+        
+        select, input, textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input:focus, textarea:focus {
+            border-color: #1890ff;
+        }
+        
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* ==============================
+           🎨 按钮颜色配置区 - 每个按钮单独配色，改这里就行
+           已移至 JS 的 BUTTON_COLORS 对象中，搜索 "按钮颜色配置" 即可找到
+           也可点击页面右下角 🎨 图标打开可视化颜色编辑面板
+           ============================== */
+
+        /* 颜色编辑面板 */
+        .color-panel-toggle {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #eb2f96, #722ed1, #1890ff);
+            color: #fff;
+            font-size: 22px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s;
+        }
+        .color-panel-toggle:hover { transform: scale(1.1); }
+
+        .color-panel {
+            position: fixed;
+            right: 20px;
+            bottom: 76px;
+            width: 340px;
+            max-height: 80vh;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .color-panel.show { display: flex; }
+
+        .color-panel-header {
+            padding: 16px;
+            background: #fafafa;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .color-panel-header h3 { font-size: 15px; color: #333; margin: 0; }
+        .color-panel-close {
+            background: none; border: none; font-size: 20px; cursor: pointer; color: #999; padding: 0 4px;
+        }
+        .color-panel-close:hover { color: #333; }
+
+        .color-panel-body {
+            overflow-y: auto;
+            padding: 12px 16px;
+            flex: 1;
+        }
+
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .color-item:last-child { border-bottom: none; }
+
+        .color-item-label {
+            font-size: 13px;
+            color: #333;
+            min-width: 80px;
+            flex-shrink: 0;
+        }
+
+        .color-item-swatches {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex: 1;
+        }
+
+        .color-swatch {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+        .color-swatch-label {
+            font-size: 10px;
+            color: #999;
+        }
+        .color-swatch input[type="color"] {
+            width: 28px;
+            height: 28px;
+            border: 2px solid #e8e8e8;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+        }
+        .color-swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+        .color-swatch input[type="color"]::-webkit-color-swatch { border-radius: 3px; border: none; }
+
+        .color-item-preview {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid #e8e8e8;
+            flex-shrink: 0;
+        }
+        
+        /* 统计信息 */
+        .stats-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 16px;
+        }
+        
+        .stats-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .stats-info strong {
+            color: #1890ff;
+            font-size: 16px;
+        }
+        
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            gap: 12px;
+        }
+        
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .toolbar-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        /* 表格 */
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .data-table th {
+            background: #fafafa;
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .data-table td {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .data-table tr:hover td {
+            background: #f5f7fa;
+        }
+        .data-table tr.row-selected td {
+            background: #e8f4fd;
+        }
+        
+        .checkbox-col {
+            width: 50px;
+            text-align: center;
+        }
+        
+        /* 模态框 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: #fff;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        /* 标签页内容 */
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* 提示信息 */
+        .tips {
+            color: #999;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="nav-tabs">
+            <div class="nav-tab active" data-tab="delivery">发货解析</div>
+            <div class="nav-tab" data-tab="inventory">库存看板</div>
+            <div class="nav-tab" data-tab="reconciliation">出货对账</div>
+        </div>
+    </div>
+    
+    <!-- 发货解析页面 -->
+    <div class="tab-content active" id="tab-delivery">
+        <div class="main-content">
+            <!-- 客户选择 -->
+            <div class="form-section">
+                <div class="form-row">
+                    <label class="form-label">1. 客户：</label>
+                    <div class="form-control" style="display: flex; gap: 12px;">
+                        <select id="customerSelect" style="flex: 1;">
+                            <option value="">请选择客户</option>
+                            <option value="大漂亮">大漂亮</option>
+                        </select>
+                        <button class="btn" data-btn="customer-add" onclick="openAddCustomerModal()">
+                            <span>+</span> 新增客户
+                        </button>
+                        <button class="btn" data-btn="customer-del" onclick="deleteSelectedCustomer()">
+                            <span>-</span> 删除客户
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 粘贴聊天内容 -->
+                <div class="form-row" style="align-items: flex-start;">
+                    <label class="form-label">2. 粘贴聊天内容：</label>
+                    <div class="form-control">
+                        <textarea id="chatContent" placeholder="请粘贴客户聊天内容，系统将自动解析出货信息..."></textarea>
+                        
+                    </div>
+                    <button class="btn" data-btn="parse" onclick="parseContent()" style="align-self: flex-start; padding: 12px 32px;">
+                        解 析
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 今日清单 -->
+            <div class="form-section">
+               
+                
+                <div class="toolbar" style="padding-top: 0;">
+                    <div class="toolbar-left">
+                        <span style="color: #333; font-size: 16px;">
+                            今日总计：<strong id="totalBoxes">0</strong>箱 | 
+                            <strong id="totalItems">0</strong> 个产品
+                        </span>
+                    </div>
+                    <div class="toolbar-actions">
+                        <button class="btn" data-btn="export-today" onclick="exportSummary()">导出今日汇总表</button>
+                        <button class="btn" data-btn="select-all" onclick="selectAll()">全选</button>
+                        <button class="btn" data-btn="deselect-all" onclick="deselectAll()">取消选择</button>
+                        <button class="btn" data-btn="shipping-notice" onclick="generateShippingNotice()">生成出货通知</button>
+                        <button class="btn" data-btn="delete-selected" onclick="deleteSelected()">删除选中</button>
+                        <button class="btn" data-btn="huolala" onclick="callHuolala()">货拉拉叫车</button>
+                    </div>
+                </div>
+                
+                <!-- 数据表格 -->
+                <div class="table-container" style="background: #e7f0e5; border-radius: 6px; max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th>序号</th>
+                                <th>品名</th>
+                                <th>箱数</th>
+                                <th>总个数</th>
+                                <th>总体积</th>
+                                <th>操作时间</th>
+                                <th>备注</th>
+                                <th>备注1</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderTableBody">
+                            <!-- 动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 库存看板页面 -->
+    <div class="tab-content" id="tab-inventory">
+        <div class="main-content">
+            <!-- 操作区 -->
+            <div class="form-section">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-title">产品信息管理</span>
+                    </div>
+                    <div class="toolbar-actions">
+                        <button class="btn" data-btn="product-add" onclick="openAddProductModal()">
+                            <span>+</span> 新增产品
+                        </button>
+                        <button class="btn" data-btn="import-inventory" onclick="importInventory()">
+                            导入Excel
+                        </button>
+                        <input type="file" id="importFileInput" style="display:none" accept=".xlsx,.xls,.csv" onchange="handleFileImport(this.files[0])">
+                        <button class="btn" data-btn="export-inventory" onclick="exportInventory()">
+                            导出Excel
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 搜索筛选 -->
+                <div class="form-row" style="margin-top: 16px;">
+                    <label class="form-label">搜索产品：</label>
+                    <div class="form-control" style="max-width: 300px;">
+                        <input type="text" id="inventorySearch" placeholder="输入产品名称或关键词搜索..." oninput="filterInventory()">
+                    </div>
+                    <button class="btn" data-btn="clear-search" onclick="document.getElementById('inventorySearch').value=''; filterInventory();">清除</button>
+                </div>
+                
+                <!-- 统计信息 -->
+                <div class="stats-section">
+                    <div class="stats-info">
+                        共 <strong id="inventoryCount">0</strong> 种产品，
+                        库存总计 <strong id="inventoryTotalBoxes">0</strong> 箱 /
+                        <strong id="inventoryTotalQty">0</strong> 个
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn" data-btn="sync-cloud" onclick="syncToCloud()" id="syncCloudBtn" style="display:none;">
+                            同步到云端
+                        </button>
+                        <button class="btn" data-btn="clear-inventory" onclick="if(confirm('确定要清空所有库存数据吗？')){inventory=[];localStorage.setItem('inventory',JSON.stringify(inventory));renderInventoryTable();alert('已清空');}">清空库存</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 库存表格 -->
+            <div class="form-section" style="padding: 0; background: #fff0f6;">
+                <div class="table-container" style="border-radius: 8px; max-height: 500px; overflow-y: auto; background: #fff0f6;">
+                    <table class="data-table" id="inventoryTable">
+                        <thead>
+                            <tr>
+                                <th>产品名称</th>
+                                <th>别名/关键词</th>
+                                <th>每箱数</th>
+                                <th>装盒数量</th>
+                                <th>每箱CBM</th>
+                                <th>盘点数量</th>
+                                <th>总箱数</th>
+                                <th>剩余个数</th>
+                                <th>出货备注</th>
+                                <th>备注1</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                            <!-- 动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 新增/编辑产品模态框 -->
+    <div class="modal-overlay" id="addProductModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header" id="productModalTitle">新增产品</div>
+            <div class="modal-body">
+                <input type="hidden" id="editProductId">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>产品名称 *</label>
+                        <input type="text" id="productName" placeholder="请输入产品名称">
+                    </div>
+                    <div class="form-group">
+                        <label>别名/关键词</label>
+                        <input type="text" id="productAlias" placeholder="请输入别名或关键词">
+                    </div>
+                    <div class="form-group">
+                        <label>装箱数</label>
+                        <input type="number" id="productBoxQty" placeholder="每箱装几个" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>装盒数量</label>
+                        <input type="number" id="productBoxCount" placeholder="每"端"包含的产品个数" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>每箱CBM</label>
+                        <input type="number" id="productVolume" placeholder="单箱的立方数" step="0.0001" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>盘点数量</label>
+                        <input type="number" id="productCheckQty" placeholder="实际盘点数量" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>初始总箱数</label>
+                        <input type="number" id="productTotalBoxes" placeholder="库存表中的总箱数" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>出货备注</label>
+                    <input type="text" id="productRemark" placeholder="出货备注">
+                </div>
+                <div class="form-group">
+                    <label>备注1</label>
+                    <input type="text" id="productRemark1" placeholder="其他备注">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-btn="cancel" onclick="closeAddProductModal()">取消</button>
+                <button class="btn" data-btn="confirm" onclick="saveProduct()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 出货通知页面 -->
+    <div class="tab-content" id="tab-shipping-notice" style="display: none;">
+        <div id="shippingNoticePage" style="padding: 20px; background: white; min-height: 100vh;">
+            <!-- 内容将动态生成 -->
+        </div>
+    </div>
+    
+    <!-- 出货对账页面 -->
+    <div class="tab-content" id="tab-reconciliation">
+        <div class="main-content">
+            <!-- 查询条件 -->
+            <div class="form-section">
+                <div class="form-row">
+                    <label class="form-label">客户：</label>
+                    <div class="form-control" style="max-width:200px;">
+                        <select id="reconCustomerSelect" style="width:100%;"></select>
+                    </div>
+                    <label class="form-label" style="min-width:80px;">开始日期：</label>
+                    <div class="form-control" style="max-width:180px;">
+                        <input type="date" id="reconStartDate">
+                    </div>
+                    <label class="form-label" style="min-width:80px;">结束日期：</label>
+                    <div class="form-control" style="max-width:180px;">
+                        <input type="date" id="reconEndDate">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">品名筛选：</label>
+                    <div class="form-control" style="max-width:300px;">
+                        <input type="text" id="reconProductFilter" placeholder="可选，按品名/别名/关键词模糊匹配">
+                    </div>
+                    <button class="btn" data-btn="recon-query" onclick="queryReconciliation()">查询</button>
+                    <button class="btn" data-btn="recon-month" onclick="queryThisMonth()">本月</button>
+                    <button class="btn" data-btn="recon-export" onclick="exportReconciliation()">导出对账表</button>
+                    <button class="btn" data-btn="supplement" onclick="openSupplementModal()">补充记录</button>
+                </div>
+            </div>
+            <!-- 明细表 -->
+            <div class="form-section">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-title">出货明细</span>
+                        <span style="color:#666; font-size:13px; margin-left:16px;" id="reconDetailCount"></span>
+                    </div>
+                    <div class="toolbar-actions">
+                        <button class="btn" data-btn="recon-select-all" onclick="selectAllRecon()">全选</button>
+                        <button class="btn" data-btn="recon-deselect-all" onclick="deselectAllRecon()">取消选择</button>
+                        <button class="btn" data-btn="recon-delete" onclick="deleteReconRecords()">删除选中</button>
+                    </div>
+                </div>
+                <div class="table-container" style="max-height:400px; overflow-y:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col"><input type="checkbox" id="reconSelectAll" onchange="toggleReconSelectAll()"></th>
+                                <th>日期</th>
+                                <th>品名</th>
+                                <th>数量(箱/端/个)</th>
+                                <th>总个数</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reconDetailBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- 汇总表 -->
+            <div class="form-section">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <span class="toolbar-title">按产品汇总</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>品名</th>
+                                <th>数量(箱/端/个)</th>
+                                <th>总个数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reconSummaryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 新增客户模态框 -->
+    <div class="modal-overlay" id="addCustomerModal">
+        <div class="modal">
+            <div class="modal-header">新增客户</div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>客户名称</label>
+                    <input type="text" id="newCustomerName" placeholder="请输入客户名称">
+                </div>
+                <div class="form-group">
+                    <label>联系电话</label>
+                    <input type="text" id="newCustomerPhone" placeholder="请输入联系电话">
+                </div>
+                <div class="form-group">
+                    <label>收货地址</label>
+                    <input type="text" id="newCustomerAddress" placeholder="请输入收货地址">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-btn="cancel" onclick="closeAddCustomerModal()">取消</button>
+                <button class="btn" data-btn="confirm" onclick="saveCustomer()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 补充记录模态框 -->
+    <div class="modal-overlay" id="supplementModal">
+        <div class="modal" style="max-width:600px;">
+            <div class="modal-header">补充记录</div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>客户</label>
+                    <select id="supplementCustomer" style="width:100%;"></select>
+                </div>
+                <div class="form-group">
+                    <label>出货日期</label>
+                    <input type="date" id="supplementDate" style="width:100%;">
+                </div>
+                <div class="form-group">
+                    <label>聊天内容</label>
+                    <textarea id="supplementContent" placeholder="粘贴客户聊天内容..." style="min-height:120px;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-btn="cancel" onclick="closeSupplementModal()">取消</button>
+                <button class="btn" data-btn="confirm" onclick="saveSupplement()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ============ CloudBase 云端数据库初始化 ============
+        const ENV_ID = 'picokpicok-6gn4hln4bbf86149';
+        
+        // 初始化CloudBase
+        let app, db;
+        let cloudConnected = false;
+        
+        async function initCloudBase() {
+            // 等待CloudBase SDK加载（最多等待5秒）
+            let attempts = 0;
+            while (!window.cloudBaseLoaded && !window.cloudBaseLoadError && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (window.cloudBaseLoadError || typeof cloudbase === 'undefined') {
+                console.warn('CloudBase SDK未加载，使用本地模式');
+                return false;
+            }
+
+            try {
+                app = cloudbase.init({
+                    env: ENV_ID
+                });
+                db = app.database();
+                cloudConnected = true;
+                console.log('云端连接成功');
+                return true;
+            } catch (err) {
+                console.error('云端连接失败:', err);
+                cloudConnected = false;
+                return false;
+            }
+        }
+        
+        // 云端状态提示
+        function showCloudStatus(connected) {
+            let statusEl = document.getElementById('cloudStatus');
+            if (!statusEl) {
+                statusEl = document.createElement('span');
+                statusEl.id = 'cloudStatus';
+                statusEl.style.marginLeft = '16px';
+                statusEl.style.fontSize = '12px';
+                document.querySelector('.header').appendChild(statusEl);
+            }
+            statusEl.innerHTML = connected 
+                ? '<span style="color:#52c41a">● 云端已连接</span>' 
+                : '<span style="color:#ff4d4f">● 本地模式</span>';
+        }
+        
+        // ============ 数据状态 ============
+
+        /* ==============================
+           🎨 按钮颜色配置区 - 每个按钮单独配色，改这里就行
+           格式: 'data-btn名': { bg: '背景色', color: '文字色', hoverBg: '悬停背景色', hoverColor: '悬停文字色' }
+           ============================== */
+        var BUTTON_COLORS = {
+            'customer-add':       { bg: '#1890ff', color: '#fff', hoverBg: '#40a9ff', hoverColor: '#fff' },  // 添加客户
+            'customer-del':       { bg: '#ff4d4f', color: '#fff', hoverBg: '#ff7875', hoverColor: '#fff' },  // 删除客户
+            'parse':              { bg: '#eb2f96', color: '#fff', hoverBg: '#f759ab', hoverColor: '#fff' },  // 发货解析
+            'export-today':       { bg: '#722ed1', color: '#fff', hoverBg: '#9254de', hoverColor: '#fff' },  // 导出今日汇总
+            'select-all':         { bg: '#f0f0f0', color: '#666', hoverBg: '#e6e6e6', hoverColor: '#333' },  // 全选
+            'deselect-all':       { bg: '#f0f0f0', color: '#666', hoverBg: '#e6e6e6', hoverColor: '#333' },  // 取消选择
+            'shipping-notice':    { bg: '#fa8c16', color: '#fff', hoverBg: '#ffa940', hoverColor: '#fff' },  // 生成出货通知
+            'delete-selected':    { bg: '#ff4d4f', color: '#fff', hoverBg: '#ff7875', hoverColor: '#fff' },  // 删除选中
+            'huolala':            { bg: '#52c41a', color: '#fff', hoverBg: '#73d13d', hoverColor: '#fff' },  // 货拉拉叫车
+            'product-add':        { bg: '#1890ff', color: '#fff', hoverBg: '#40a9ff', hoverColor: '#fff' },  // 添加产品
+            'import-inventory':   { bg: '#597ef7', color: '#fff', hoverBg: '#85a5ff', hoverColor: '#fff' },  // 导入库存
+            'export-inventory':   { bg: '#597ef7', color: '#fff', hoverBg: '#85a5ff', hoverColor: '#fff' },  // 导出库存
+            'clear-search':       { bg: '#f0f0f0', color: '#666', hoverBg: '#e6e6e6', hoverColor: '#333' },  // 清除搜索
+            'clear-inventory':    { bg: '#ff4d4f', color: '#fff', hoverBg: '#ff7875', hoverColor: '#fff' },  // 清空库存
+            'recon-query':        { bg: '#1890ff', color: '#fff', hoverBg: '#40a9ff', hoverColor: '#fff' },  // 对账查询
+            'recon-month':        { bg: '#13c2c2', color: '#fff', hoverBg: '#36cfc9', hoverColor: '#fff' },  // 本月查询
+            'recon-export':       { bg: '#722ed1', color: '#fff', hoverBg: '#9254de', hoverColor: '#fff' },  // 导出对账表
+            'recon-delete':       { bg: '#ff4d4f', color: '#fff', hoverBg: '#ff7875', hoverColor: '#fff' },  // 对账删除选中
+            'recon-select-all':   { bg: '#f0f0f0', color: '#666', hoverBg: '#e6e6e6', hoverColor: '#333' },  // 对账全选
+            'recon-deselect-all': { bg: '#f0f0f0', color: '#666', hoverBg: '#e6e6e6', hoverColor: '#333' },  // 对账取消选择
+            'supplement':         { bg: '#52c41a', color: '#fff', hoverBg: '#73d13d', hoverColor: '#fff' },  // 补充记录
+            'cancel':             { bg: '#f0f0f0', color: '#666', hoverBg: '#e6e6e6', hoverColor: '#333' },  // 取消
+            'confirm':            { bg: '#1890ff', color: '#fff', hoverBg: '#40a9ff', hoverColor: '#fff' },  // 确认保存
+            'edit-product':       { bg: '#597ef7', color: '#fff', hoverBg: '#85a5ff', hoverColor: '#fff' },  // 编辑产品
+            'delete-product':     { bg: '#ff4d4f', color: '#fff', hoverBg: '#ff7875', hoverColor: '#fff' },  // 删除产品
+        };
+
+        // 默认颜色备份（用于恢复）
+        var DEFAULT_BUTTON_COLORS = JSON.parse(JSON.stringify(BUTTON_COLORS));
+
+        // 从 localStorage 恢复自定义颜色
+        var savedColors = localStorage.getItem('buttonColors');
+        if (savedColors) {
+            try {
+                var parsed = JSON.parse(savedColors);
+                for (var k in parsed) {
+                    if (BUTTON_COLORS[k] && parsed[k].bg && parsed[k].color) {
+                        BUTTON_COLORS[k] = parsed[k];
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // 按钮中文名映射
+        var BUTTON_NAMES = {
+            'customer-add':       '添加客户',
+            'customer-del':       '删除客户',
+            'parse':              '发货解析',
+            'export-today':       '导出今日汇总',
+            'select-all':         '全选',
+            'deselect-all':       '取消选择',
+            'shipping-notice':    '生成出货通知',
+            'delete-selected':    '删除选中',
+            'huolala':            '货拉拉叫车',
+            'product-add':        '添加产品',
+            'import-inventory':   '导入库存',
+            'export-inventory':   '导出库存',
+            'clear-search':       '清除搜索',
+            'clear-inventory':    '清空库存',
+            'recon-query':        '对账查询',
+            'recon-month':        '本月查询',
+            'recon-export':       '导出对账表',
+            'recon-delete':       '对账删除选中',
+            'recon-select-all':   '对账全选',
+            'recon-deselect-all': '对账取消选择',
+            'supplement':         '补充记录',
+            'cancel':             '取消',
+            'confirm':            '确认保存',
+            'edit-product':       '编辑产品',
+            'delete-product':     '删除产品',
+        };
+
+        // 颜色编辑面板
+        function toggleColorPanel() {
+            var panel = document.getElementById('colorPanel');
+            if (!panel.classList.contains('show')) {
+                renderColorPanel();
+            }
+            panel.classList.toggle('show');
+        }
+
+        function renderColorPanel() {
+            var body = document.getElementById('colorPanelBody');
+            var html = '';
+            for (var key in BUTTON_COLORS) {
+                var c = BUTTON_COLORS[key];
+                var name = BUTTON_NAMES[key] || key;
+                html += '<div class="color-item">'
+                    + '<span class="color-item-label">' + name + '</span>'
+                    + '<div class="color-item-swatches">'
+                    +   '<div class="color-swatch">'
+                    +     '<span class="color-swatch-label">背景</span>'
+                    +     '<input type="color" value="' + c.bg + '" onchange="updateBtnColor(\'' + key + '\',\'bg\',this.value)">'
+                    +   '</div>'
+                    +   '<div class="color-swatch">'
+                    +     '<span class="color-swatch-label">悬停</span>'
+                    +     '<input type="color" value="' + c.hoverBg + '" onchange="updateBtnColor(\'' + key + '\',\'hoverBg\',this.value)">'
+                    +   '</div>'
+                    +   '<div class="color-swatch">'
+                    +     '<span class="color-swatch-label">文字</span>'
+                    +     '<input type="color" value="' + c.color + '" onchange="updateBtnColor(\'' + key + '\',\'color\',this.value)">'
+                    +   '</div>'
+                    + '</div>'
+                    + '<div class="color-item-preview" style="background:' + c.bg + ';color:' + c.color + ';display:flex;align-items:center;justify-content:center;font-size:10px;">Aa</div>'
+                    + '</div>';
+            }
+            body.innerHTML = html;
+        }
+
+        function updateBtnColor(key, prop, value) {
+            BUTTON_COLORS[key][prop] = value;
+            localStorage.setItem('buttonColors', JSON.stringify(BUTTON_COLORS));
+            applyButtonColors();
+            renderColorPanel();
+        }
+
+        function resetButtonColors() {
+            if (!confirm('确定恢复所有按钮为默认颜色？')) return;
+            BUTTON_COLORS = JSON.parse(JSON.stringify(DEFAULT_BUTTON_COLORS));
+            localStorage.setItem('buttonColors', JSON.stringify(BUTTON_COLORS));
+            applyButtonColors();
+            renderColorPanel();
+        }
+        /* 配置区结束 */
+
+        // 应用按钮颜色
+        function applyButtonColors() {
+            document.querySelectorAll('.btn[data-btn]').forEach(function(btn) {
+                var key = btn.getAttribute('data-btn');
+                var c = BUTTON_COLORS[key];
+                if (!c) return;
+                btn.style.background = c.bg;
+                btn.style.color = c.color;
+                btn.addEventListener('mouseenter', function() { btn.style.background = c.hoverBg; btn.style.color = c.hoverColor; });
+                btn.addEventListener('mouseleave', function() { btn.style.background = c.bg; btn.style.color = c.color; });
+            });
+        }
+        // 页面加载后应用
+        document.addEventListener('DOMContentLoaded', applyButtonColors);
+
+        let orders = [];
+        let reconRecords = [];  // 出货对账独立数据
+        let customers = [];
+        let inventory = [];
+        
+        // ============ 初始化 ============
+        document.addEventListener('DOMContentLoaded', async function() {
+            showCloudStatus(false);
+
+            // 尝试连接云端
+            const connected = await initCloudBase();
+            showCloudStatus(connected);
+
+            if (connected) {
+                // 从云端加载数据
+                await loadDataFromCloud();
+                reconRecords = JSON.parse(localStorage.getItem('reconRecords') || '[]');
+
+                // 如果云端已连接，显示同步按钮
+                const syncBtn = document.getElementById('syncCloudBtn');
+                if (syncBtn) syncBtn.style.display = 'inline-block';
+            } else {
+                // 降级到本地
+                orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                reconRecords = JSON.parse(localStorage.getItem('reconRecords') || '[]');
+                customers = ['大漂亮'];
+                localStorage.setItem('customers', JSON.stringify(customers));
+                inventory = JSON.parse(localStorage.getItem('inventory') || '[]');
+            }
+
+            updateCustomerSelect();
+            renderTable();
+            updateStats();
+            renderInventoryTable();
+            populateReconCustomers();
+
+            // 标签页切换
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+                    if (this.dataset.tab === 'reconciliation') {
+                        populateReconCustomers();
+                    }
+                });
+            });
+        });
+        
+        // ============ 云端数据操作 ============
+        async function loadDataFromCloud() {
+            try {
+                // 加载客户
+                const customerRes = await db.collection('customers').get();
+                customers = customerRes.data.map(c => c.name);
+                if (customers.length === 0) customers = ['大漂亮'];
+                
+                // 加载库存
+                const inventoryRes = await db.collection('inventory').get();
+                inventory = inventoryRes.data;
+                
+                // 加载订单
+                const orderRes = await db.collection('orders').get();
+                orders = orderRes.data;
+                
+            } catch (err) {
+                console.error('加载云端数据失败:', err);
+                // 降级到本地
+                orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                customers = JSON.parse(localStorage.getItem('customers') || '["大漂亮"]');
+                inventory = JSON.parse(localStorage.getItem('inventory') || '[]');
+            }
+        }
+        
+        async function saveToCloud(collection, data, action) {
+            if (!cloudConnected) return false;
+            try {
+                if (action === 'add') {
+                    await db.collection(collection).add(data);
+                } else if (action === 'update') {
+                    await db.collection(collection).doc(data._id).update(data);
+                } else if (action === 'delete') {
+                    await db.collection(collection).doc(data._id).remove();
+                } else if (action === 'set') {
+                    // 先删除所有，再批量添加
+                    await db.collection(collection).where({}).remove();
+                    if (data.length > 0) {
+                        await db.collection(collection).add(data);
+                    }
+                }
+                return true;
+            } catch (err) {
+                console.error('云端同步失败:', err);
+                return false;
+            }
+        }
+        
+        // ============ 客户管理 ============
+        function updateCustomerSelect() {
+            const select = document.getElementById('customerSelect');
+            select.innerHTML = '<option value="">请选择客户</option>';
+            customers.forEach(customer => {
+                const option = document.createElement('option');
+                option.value = customer;
+                option.textContent = customer;
+                select.appendChild(option);
+            });
+            // 默认选择"大漂亮"
+            if (customers.includes('大漂亮')) {
+                select.value = '大漂亮';
+            }
+        }
+        
+        function openAddCustomerModal() {
+            document.getElementById('addCustomerModal').classList.add('active');
+        }
+        
+        function closeAddCustomerModal() {
+            document.getElementById('addCustomerModal').classList.remove('active');
+            document.getElementById('newCustomerName').value = '';
+            document.getElementById('newCustomerPhone').value = '';
+            document.getElementById('newCustomerAddress').value = '';
+        }
+
+        function deleteSelectedCustomer() {
+            const select = document.getElementById('customerSelect');
+            const selectedCustomer = select.value;
+
+            if (!selectedCustomer) {
+                alert('请先选择要删除的客户');
+                return;
+            }
+
+            if (selectedCustomer === '大漂亮') {
+                alert('"大漂亮"是默认客户,不能删除');
+                return;
+            }
+
+            // 检查是否有该客户的订单
+            const hasOrders = orders.some(o => o.customer === selectedCustomer);
+            if (hasOrders) {
+                if (!confirm(`警告: 客户"${selectedCustomer}"有订单记录,删除客户将同时删除所有相关订单!\n\n确定要继续删除吗?`)) return;
+
+                // 删除该客户的所有订单
+                const deletedOrders = orders.filter(o => o.customer === selectedCustomer);
+                orders = orders.filter(o => o.customer !== selectedCustomer);
+
+                // 同步云端
+                if (cloudConnected) {
+                    deletedOrders.forEach(async order => {
+                        await saveToCloud('orders', order, 'delete');
+                    });
+                }
+
+                localStorage.setItem('orders', JSON.stringify(orders));
+                renderTable();
+                updateStats();
+
+                alert(`已删除客户"${selectedCustomer}"及${deletedOrders.length}条订单记录`);
+            } else {
+                if (!confirm(`确定要删除客户"${selectedCustomer}"吗？`)) return;
+                alert(`已删除客户"${selectedCustomer}"`);
+            }
+
+            // 从客户列表中删除
+            customers = customers.filter(c => c !== selectedCustomer);
+            localStorage.setItem('customers', JSON.stringify(customers));
+
+            // 更新下拉框
+            updateCustomerSelect();
+        }
+
+        async function saveCustomer() {
+            const name = document.getElementById('newCustomerName').value.trim();
+            if (!name) {
+                alert('请输入客户名称');
+                return;
+            }
+            if (customers.includes(name)) {
+                alert('该客户已存在');
+                return;
+            }
+            
+            const newCustomer = { name: name, phone: document.getElementById('newCustomerPhone').value.trim(), address: document.getElementById('newCustomerAddress').value.trim() };
+            
+            if (cloudConnected) {
+                await saveToCloud('customers', newCustomer, 'add');
+            }
+            
+            customers.push(name);
+            localStorage.setItem('customers', JSON.stringify(customers));
+            updateCustomerSelect();
+            document.getElementById('customerSelect').value = name;
+            closeAddCustomerModal();
+        }
+        
+        // ============ 智能订单解析 ============
+
+        // 中文数字转阿拉伯数字
+        function chineseNumberToArabic(cn) {
+            const cnMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '百': 100 };
+            if (cn.length === 1) return cnMap[cn] || parseInt(cn);
+            if (cn === '十') return 10;
+            if (cn.includes('十')) {
+                const parts = cn.split('十');
+                const left = cnMap[parts[0]] || 1;
+                const right = cnMap[parts[1]] || 0;
+                return left * 10 + right;
+            }
+            return cnMap[cn] || parseInt(cn);
+        }
+
+        // 解析数字（支持阿拉伯数字和中文数字）
+        function parseNumber(str) {
+            if (!str) return 0;
+            str = str.trim();
+            // 纯阿拉伯数字
+            if (/^\d+$/.test(str)) return parseInt(str);
+            // 纯中文数字
+            if (/^[\u4e00-\u9fa5]+$/.test(str)) return chineseNumberToArabic(str);
+            // 混合（数字+中文，如123箱）
+            const match = str.match(/^(\d+)[\u4e00-\u9fa5]*$/);
+            if (match) return parseInt(match[1]);
+            return 0;
+        }
+
+        // 从片段中提取规格（如400体、100体）
+        function extractSpec(fragment) {
+            const match = fragment.match(/(\d+)\s*体/);
+            return match ? match[1] : null;
+        }
+
+        // 从片段中提取关键词（用于匹配）
+        function extractKeywords(fragment) {
+            const keywords = [];
+
+            // 提取"数字+体"规格
+            const specMatch = fragment.match(/(\d+)\s*体/);
+            if (specMatch) {
+                keywords.push({ text: specMatch[0], priority: 10 }); // 高优先级
+            }
+
+            // 按 &、和、、拆分成多段
+            const segments = fragment.split(/[&+，和、]/);
+
+            segments.forEach(seg => {
+                seg = seg.trim();
+                if (!seg) return;
+
+                // 提取中文词
+                const chineseMatches = seg.match(/[\u4e00-\u9fa5]+/g);
+                if (chineseMatches) {
+                    chineseMatches.forEach(m => {
+                        if (m.length > 1) { // 单字不参与匹配
+                            keywords.push({ text: m, priority: m.length });
+                        }
+                    });
+                }
+
+                // 提取数字
+                const numMatches = seg.match(/\d+/g);
+                if (numMatches) {
+                    numMatches.forEach(m => {
+                        if (m.length >= 2) { // 至少2位数字
+                            keywords.push({ text: m, priority: m.length - 1 });
+                        }
+                    });
+                }
+            });
+
+            // 按优先级（长度）从高到低排序
+            keywords.sort((a, b) => b.priority - a.priority);
+
+            return keywords.map(k => k.text);
+        }
+
+        // 匹配产品（按优先级）
+        function matchProduct(fragment, contextBefore, contextAfter) {
+            if (!fragment) return null;
+
+            const pName = fragment.toLowerCase();
+            const keywords = extractKeywords(fragment);
+
+            // 合并上下文到关键词
+            const allKeywords = [...keywords];
+            if (contextBefore) {
+                const beforeKw = extractKeywords(contextBefore);
+                beforeKw.forEach(k => {
+                    if (!allKeywords.includes(k)) allKeywords.push(k);
+                });
+            }
+            if (contextAfter) {
+                const afterKw = extractKeywords(contextAfter);
+                afterKw.forEach(k => {
+                    if (!allKeywords.includes(k)) allKeywords.push(k);
+                });
+            }
+
+            // 按优先级匹配
+            for (let inv of inventory) {
+                const invName = (inv.name || '').toLowerCase();
+                const invAlias = (inv.alias || '').toLowerCase();
+
+                // 优先级1：精确匹配品名
+                if (invName === pName) {
+                    return inv;
+                }
+
+                // 优先级2：精确匹配别名
+                if (invAlias) {
+                    const aliases = invAlias.split(/[,，]/).map(a => a.trim().toLowerCase());
+                    if (aliases.includes(pName)) {
+                        return inv;
+                    }
+                }
+            }
+
+            // 优先级3：子串匹配（用关键词）
+            let bestMatch = null;
+            let bestScore = 0;
+
+            for (let inv of inventory) {
+                const invName = (inv.name || '').toLowerCase();
+                const invAlias = (inv.alias || '').toLowerCase();
+
+                let score = 0;
+                let matchedKeyword = '';
+
+                for (let kw of allKeywords) {
+                    if (kw.length <= 1) continue;
+
+                    const kwLower = kw.toLowerCase();
+
+                    // 检查品名是否包含关键词
+                    if (invName.includes(kwLower)) {
+                        // 有规格时优先返回品名含该规格的产品
+                        const spec = extractSpec(fragment);
+                        if (spec && invName.includes(spec + '体')) {
+                            score += 100;
+                        } else {
+                            score += kw.length;
+                        }
+                        matchedKeyword = kw;
+                    }
+
+                    // 检查别名是否包含关键词
+                    if (invAlias && invAlias.includes(kwLower)) {
+                        score += kw.length * 0.8;
+                        if (!matchedKeyword) matchedKeyword = kw;
+                    }
+                }
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = inv;
+                }
+            }
+
+            if (bestScore > 0) {
+                return bestMatch;
+            }
+
+            // 优先级4：仍未匹配，使用片段作为品名
+            return null;
+        }
+
+        // 计算总个数和总体积
+        function calculate(unit, boxes, inventoryItem) {
+            let totalQty = 0;
+            let totalVolume = 0;
+
+            if (unit === '端') {
+                // 端：总个数 = 箱数 × 装盒数量
+                const boxCount = parseInt(inventoryItem?.boxCount) || 0;
+                totalQty = boxes * boxCount;
+                totalVolume = 0;
+            } else if (['箱', '盒', 'ctn'].includes(unit)) {
+                // 箱/盒/ctn：总个数 = 箱数 × 每箱个数，总方数 = 箱数 × 单箱体积
+                const boxQty = parseInt(inventoryItem?.boxQty) || 0;
+                const volume = parseFloat(inventoryItem?.volume) || 0;
+                totalQty = boxes * boxQty;
+                totalVolume = boxes * volume;
+            } else if (['个', '件', 'pcs'].includes(unit)) {
+                // 个/件/pcs：总个数 = 箱数 × 1，总方数 = 0
+                totalQty = boxes;
+                totalVolume = 0;
+            }
+
+            return { totalQty, totalVolume };
+        }
+
+        async function parseContent() {
+            const customerSelect = document.getElementById('customerSelect').value;
+            const content = document.getElementById('chatContent').value.trim();
+
+            if (!content) {
+                alert('请粘贴聊天内容');
+                return;
+            }
+
+            // 清理内容
+            const cleanContent = content.replace(/^\/+|\/+$/g, '').trim();
+
+            // ===== 客户信息使用页面下拉框选择的值 =====
+            let customer = customerSelect;
+
+            // ===== 解析产品 =====
+            const products = [];
+            const unitPattern = /(\d+|[一二三四五六七八九十百]+)\s*(箱|个|件|盒|端|ctn|ctns|pcs)/gi;
+
+            let lastIndex = 0;
+            let match;
+            const matches = [];
+
+            // 查找所有"数字+单位"的匹配
+            while ((match = unitPattern.exec(cleanContent)) !== null) {
+                const numStr = match[1];
+                const unit = match[2].toLowerCase();
+                const boxes = parseNumber(numStr);
+                const matchStart = match.index;
+                const matchEnd = match.index + match[0].length;
+
+                // 获取匹配前后的上下文
+                const contextBefore = cleanContent.substring(Math.max(0, matchStart - 18), matchStart);
+                const contextAfter = cleanContent.substring(matchEnd, Math.min(cleanContent.length, matchEnd + 18));
+
+                // 找到下一个数字+单位的位置作为结束
+                let nextMatch = unitPattern.exec(cleanContent);
+                unitPattern.lastIndex = matchEnd; // 恢复正则位置
+                let endPos = nextMatch ? nextMatch.index : cleanContent.length;
+
+                // 提取片段（产品名在匹配项之前，从匹配项往前找）
+                let fragment = '';
+                if (contextBefore) {
+                    // 从上下文前面提取最后一段（可能是产品名）
+                    const parts = contextBefore.split(/[\n,，]/);
+                    fragment = parts[parts.length - 1].trim();
+                }
+                // 如果前面没提取到，尝试从后面提取
+                if (!fragment) {
+                    fragment = cleanContent.substring(matchEnd, endPos).trim();
+                }
+
+                // 遇到分隔符停止
+                const sepIndex = fragment.search(/[➕&，、\n]/);
+                if (sepIndex !== -1) {
+                    fragment = fragment.substring(0, sepIndex);
+                }
+
+                // 限制30字符
+                if (fragment.length > 30) {
+                    fragment = fragment.substring(0, 30);
+                }
+
+                // 提取规格
+                const spec = extractSpec(fragment);
+
+                // 匹配产品
+                const foundProduct = matchProduct(fragment, contextBefore, contextAfter);
+                const finalProductName = foundProduct ? foundProduct.name : (fragment || '未识别');
+
+                // 计算总个数和总体积
+                const { totalQty, totalVolume } = calculate(unit, boxes, foundProduct);
+
+                products.push({
+                    name: finalProductName,
+                    boxes: boxes,
+                    quantity: totalQty,
+                    volume: totalVolume,
+                    unit: unit === 'ctn' ? '箱' : unit,
+                    foundInInventory: foundProduct !== null,
+                    rawFragment: fragment
+                });
+            }
+
+            if (products.length === 0) {
+                alert('未能识别货物信息，请检查格式（如：30箱产品名）');
+                return;
+            }
+
+            // ===== 创建订单 =====
+            let parsedCount = 0;
+            const now = new Date().toLocaleString('zh-CN');
+
+            products.forEach((p, index) => {
+                const order = {
+                    _id: Date.now().toString() + index,
+                    customer: customer,
+                    productName: p.name,
+                    boxes: p.boxes,
+                    quantity: p.quantity,
+                    volume: p.volume,
+                    unit: p.unit,
+                    remark: cleanContent,
+                    remark1: p.foundInInventory ? '' : '⚠️未匹配到库存',
+                    time: now
+                };
+                orders.push(order);
+
+                if (cloudConnected) {
+                    saveToCloud('orders', order, 'add');
+                }
+                parsedCount++;
+            });
+
+            localStorage.setItem('orders', JSON.stringify(orders));
+            document.getElementById('chatContent').value = '';
+            renderTable();
+            updateStats();
+
+            const totalBoxes = products.reduce((s, p) => s + p.boxes, 0);
+            const totalQty = products.reduce((s, p) => s + p.quantity, 0);
+            const totalVol = products.reduce((s, p) => s + p.volume, 0);
+            const notFound = products.filter(p => !p.foundInInventory).length;
+
+            let msg = `解析成功！共${parsedCount}条货物，${totalBoxes}箱，${totalQty}个，${totalVol.toFixed(3)}方`;
+            if (notFound > 0) {
+                msg += `\n⚠️${notFound}个产品未在库存中找到`;
+            }
+            alert(msg);
+        }
+        
+        // ============ 订单表格 ============
+        function renderTable() {
+            const tbody = document.getElementById('orderTableBody');
+            tbody.innerHTML = '';
+            
+            const today = new Date().toDateString();
+            const todayOrders = orders.filter(o => new Date(o.time).toDateString() === today);
+            
+            todayOrders.forEach((order, index) => {
+                const tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                // 格式化时间到分钟
+                const orderTime = order.time ? new Date(order.time).toLocaleString('zh-CN', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
+                // 合并单位和箱数
+                const boxesDisplay = order.unit ? `${order.boxes}${order.unit}` : `${order.boxes}箱`;
+                tr.innerHTML = `
+                    <td class="checkbox-col" onclick="event.stopPropagation();"><input type="checkbox" class="row-checkbox" data-id="${order._id}"></td>
+                    <td>${index + 1}</td>
+                    <td>${order.productName}</td>
+                    <td>${boxesDisplay}</td>
+                    <td>${order.quantity || ''}</td>
+                    <td>${order.volume ? order.volume.toFixed(3) : ''}</td>
+                    <td>${orderTime}</td>
+                    <td>${order.remark || ''}</td>
+                    <td class="editable-cell" data-id="${order._id}" data-field="remark1" ondblclick="editRemark1(this)">${order.remark1 || ''}</td>
+                `;
+                // 点击行切换选中状态
+                tr.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'INPUT') return;
+                    const checkbox = this.querySelector('.row-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                });
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 双击编辑备注1
+        function editRemark1(td) {
+            const orderId = td.dataset.id;
+            const currentValue = td.textContent.trim();
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentValue;
+            input.style.cssText = 'width:100%;border:1px solid #1890ff;padding:4px;';
+            input.onblur = async function() {
+                const newValue = this.value.trim();
+                if (newValue !== currentValue) {
+                    // 更新本地数据
+                    const order = orders.find(o => o._id === orderId);
+                    if (order) {
+                        order.remark1 = newValue;
+                        localStorage.setItem('orders', JSON.stringify(orders));
+                        // 同步云端
+                        if (cloudConnected) {
+                            await saveToCloud('orders', order, 'update');
+                        }
+                    }
+                }
+                td.textContent = newValue || '';
+            };
+            input.onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    this.blur();
+                }
+                if (e.key === 'Escape') {
+                    td.textContent = currentValue;
+                }
+            };
+            td.textContent = '';
+            td.appendChild(input);
+            input.focus();
+        }
+        
+        function updateStats() {
+            const today = new Date().toDateString();
+            const todayOrders = orders.filter(o => new Date(o.time).toDateString() === today);
+
+            const totalBoxes = todayOrders.reduce((sum, o) => sum + (o.boxes || 0), 0);
+            const totalQuantity = todayOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
+            const totalVolume = todayOrders.reduce((sum, o) => sum + (o.volume || 0), 0);
+
+            document.getElementById('totalBoxes').textContent = totalBoxes;
+            document.getElementById('totalItems').textContent = totalQuantity;
+        }
+        
+        // ============ 工具函数 ============
+        function toggleSelectAll() {
+            const checked = document.getElementById('selectAllCheckbox').checked;
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = checked);
+        }
+        
+        function selectAll() {
+            document.getElementById('selectAllCheckbox').checked = true;
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = true);
+        }
+        
+        function deselectAll() {
+            document.getElementById('selectAllCheckbox').checked = false;
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+        }
+        
+        async function deleteSelected() {
+            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('请先选择要删除的订单');
+                return;
+            }
+
+            if (!confirm(`确定要删除选中的 ${checkboxes.length} 条订单吗？`)) return;
+
+            const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.id);
+            const toDelete = orders.filter(o => selectedIds.includes(o._id));
+
+            orders = orders.filter(o => !selectedIds.includes(o._id));
+
+            if (cloudConnected) {
+                for (const order of toDelete) {
+                    await saveToCloud('orders', order, 'delete');
+                }
+            }
+
+            localStorage.setItem('orders', JSON.stringify(orders));
+            renderTable();
+            updateStats();
+            alert(`已删除 ${toDelete.length} 条订单`);
+        }
+        
+
+        // 导出今日汇总表
+        async function exportSummary() {
+            var today = new Date();
+            var todayStr = today.toDateString();
+            var todayOrders = orders.filter(function(o) { return new Date(o.time).toDateString() === todayStr; });
+
+            if (todayOrders.length === 0) {
+                alert('今日没有订单可导出');
+                return;
+            }
+
+            var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+            var workbook = new ExcelJS.Workbook();
+            workbook.creator = '线上发单系统';
+
+            // ===== Sheet1: 发货明细 =====
+            var sheet1 = workbook.addWorksheet('发货明细');
+            sheet1.columns = [
+                { width: 6 }, { width: 20 }, { width: 12 }, { width: 10 },
+                { width: 18 }, { width: 36 }, { width: 30 }
+            ];
+
+            var thinBorder = {
+                top: { style: 'thin', color: { argb: 'FF4F81BD' } },
+                bottom: { style: 'thin', color: { argb: 'FF4F81BD' } },
+                left: { style: 'thin', color: { argb: 'FF4F81BD' } },
+                right: { style: 'thin', color: { argb: 'FF4F81BD' } }
+            };
+
+            // 标题行
+            var titleRow = sheet1.addRow(['发货明细(' + dateStr + ')']);
+            titleRow.height = 28;
+            sheet1.mergeCells('A1:G1');
+            titleRow.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            // 表头
+            var headerRow = sheet1.addRow(['序号', '品名', '数量(箱/端/个)', '总个数(pcs)', '操作时间', '备注', '备注1']);
+            headerRow.height = 22;
+            headerRow.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } };
+                cell.font = { bold: true, color: { argb: 'FF1F4E79' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            // 数据行
+            todayOrders.forEach(function(order, index) {
+                var timeStr = order.time ? new Date(order.time).toLocaleString('zh-CN') : '';
+                var qtyStr = order.unit ? order.boxes + order.unit : order.boxes + '箱';
+                var isOdd = index % 2 === 1;
+                var bgColor = isOdd ? 'FFDEEAF6' : 'FFFFFFFF';
+
+                var row = sheet1.addRow([
+                    index + 1, order.productName || '', qtyStr,
+                    order.quantity || 0, timeStr, order.remark || '', order.remark1 || ''
+                ]);
+                row.height = 18;
+                row.eachCell({ includeEmpty: true }, function(cell, colNumber) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+                    cell.font = { size: 9 };
+                    cell.border = thinBorder;
+                    if (colNumber === 2 || colNumber >= 6) {
+                        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                    } else {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+                });
+            });
+
+            // ===== Sheet2: 仓库核对汇总 =====
+            var summaryMap = {};
+            todayOrders.forEach(function(order) {
+                var name = order.productName || '未识别';
+                if (!summaryMap[name]) summaryMap[name] = { boxes: 0, duan: 0, ges: 0, totalQty: 0 };
+                var unit = (order.unit || '箱').toLowerCase();
+                if (unit === '端') summaryMap[name].duan += order.boxes;
+                else if (unit === '个') summaryMap[name].ges += order.boxes;
+                else summaryMap[name].boxes += order.boxes;
+                summaryMap[name].totalQty += order.quantity || 0;
+            });
+
+            var sheet2 = workbook.addWorksheet('仓库核对汇总');
+            sheet2.columns = [{ width: 26 }, { width: 18 }, { width: 14 }];
+
+            var hRow = sheet2.addRow(['品名', '数量(箱/端/个)', '总个数(pcs)']);
+            hRow.height = 22;
+            hRow.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } };
+                cell.font = { bold: true, color: { argb: 'FF1F4E79' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            var rowIdx = 0;
+            Object.keys(summaryMap).forEach(function(name) {
+                var s = summaryMap[name];
+                var qtyParts = [];
+                if (s.boxes > 0) qtyParts.push(s.boxes + '箱');
+                if (s.duan > 0) qtyParts.push(s.duan + '端');
+                if (s.ges > 0) qtyParts.push(s.ges + '个');
+                var qtyStr = qtyParts.length > 0 ? qtyParts.join(' ') : '0';
+                var bgColor2 = rowIdx % 2 === 0 ? 'FFDEEAF6' : 'FFFFFFFF';
+
+                var row = sheet2.addRow([name, qtyStr, s.totalQty]);
+                row.eachCell(function(cell, colNumber) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor2 } };
+                    cell.font = { size: 10 };
+                    cell.border = thinBorder;
+                    cell.alignment = { horizontal: colNumber === 1 ? 'left' : 'center', vertical: 'middle' };
+                });
+                rowIdx++;
+            });
+
+            // 保存
+            var buffer = await workbook.xlsx.writeBuffer();
+            var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '今日汇总_' + dateStr + '.xlsx';
+            link.click();
+
+            // 标记已发货，并复制到对账记录
+            todayOrders.forEach(function(order) {
+                order.deducted = true;
+                // 复制到独立对账数据（避免主页面删除影响对账）
+                if (!reconRecords.find(function(r) { return r._id === order._id; })) {
+                    reconRecords.push(JSON.parse(JSON.stringify(order)));
+                }
+            });
+            localStorage.setItem('orders', JSON.stringify(orders));
+            localStorage.setItem('reconRecords', JSON.stringify(reconRecords));
+
+            // 扣减库存
+            todayOrders.forEach(function(order) {
+                var inv = inventory.find(function(i) { return i.name === order.productName; });
+                if (inv) inv.boxCount = Math.max(0, (inv.boxCount || 0) - order.boxes);
+            });
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+
+            renderTable();
+            renderInventoryTable();
+            updateStats();
+            alert('导出成功！');
+        }
+        
+        async function generateShippingNotice() {
+            try {
+                const selected = document.querySelectorAll('.row-checkbox:checked');
+                if (selected.length === 0) {
+                    alert('请先选择要生成出货通知的订单');
+                    return;
+                }
+                
+                const customer = document.getElementById('customerSelect').value;
+                if (!customer) {
+                    alert('请先选择客户');
+                    return;
+                }
+                
+                const selectedIds = Array.from(selected).map(cb => cb.dataset.id);
+                const selectedOrders = orders.filter(o => selectedIds.includes(o._id));
+                
+                if (!selectedOrders || selectedOrders.length === 0) {
+                    alert('未找到选中的订单数据');
+                    return;
+                }
+                
+                // 获取客户信息
+                const customerData = customers.find(c => c.name === customer);
+                const customerAddress = customerData ? customerData.address || '' : '';
+                const customerContact = customerData ? customerData.contact || '' : '';
+                const customerLogistics = customerData ? customerData.logistics || '货拉拉' : '货拉拉';
+                
+                // 按地址分组（从每个订单的完整信息中提取地址）
+                const addressGroups = {};
+
+                selectedOrders.forEach(order => {
+                    let orderAddress = '';
+                    let foundAddress = false;
+
+                    // 从订单的完整备注中提取地址
+                    if (order.remark) {
+                        const remarkLines = order.remark.split('\n');
+
+                        // 遍历所有行，查找包含地址信息的行
+                        for (let line of remarkLines) {
+                            line = line.trim();
+
+                            // 如果行中包含这些关键词，认为是地址
+                            if (line.includes('地址') || line.includes('省') || line.includes('市') ||
+                                line.includes('区') || line.includes('镇') || line.includes('街道') ||
+                                line.includes('路') || line.includes('街') || line.includes('号') ||
+                                line.includes('栋') || line.includes('楼') || line.includes('层') ||
+                                line.includes('工业园') || line.includes('大厦') || line.includes('仓库')) {
+
+                                // 提取地址（去掉"地址："等前缀）
+                                let addr = line;
+                                if (line.includes('地址')) {
+                                    addr = line.replace(/.*[:：]/, '').trim();
+                                }
+
+                                // 如果地址有效（长度大于5且包含地名特征）
+                                if (addr.length > 5 && /[市镇区路街巷号楼层]/.test(addr)) {
+                                    orderAddress = addr;
+                                    foundAddress = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // 如果没有找到地址，使用客户的默认地址
+                    if (!foundAddress || !orderAddress) {
+                        orderAddress = customerAddress || '未指定地址';
+                    }
+
+                    // 标准化地址（去除多余空格）
+                    orderAddress = orderAddress.replace(/\s+/g, ' ').trim();
+
+                    // 添加到对应的分组
+                    if (!addressGroups[orderAddress]) {
+                        addressGroups[orderAddress] = [];
+                    }
+                    addressGroups[orderAddress].push(order);
+                });
+                
+                // 调试信息：输出分组情况
+                console.log('地址分组结果:', addressGroups);
+                console.log('分组数量:', Object.keys(addressGroups).length);
+                
+                // 生成出货通知内容
+                let html = `
+                    <div style="padding: 10px; max-width: 100%; margin: 0 auto;">
+                `;
+
+                // 按地址分组生成表格
+                const addresses = Object.keys(addressGroups);
+
+                // 页面顶部：日期 + 客户（同一行）
+                html += `
+                    <div style="margin: 5px 10px; font-size: 13px;">
+                        <strong>日期：</strong>${new Date().toLocaleDateString('zh-CN')} &nbsp;&nbsp; <strong>客户：</strong>${customer}
+                    </div>
+                `;
+
+                addresses.forEach((addr, groupIndex) => {
+                    const groupOrders = addressGroups[addr];
+
+                    html += `
+                        <div style="margin: 5px 10px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                            <colgroup>
+                                <col style="width: 14%;">
+                                <col style="width: 3%;">
+                                <col style="width: 5%;">
+                                <col style="width: 4%;">
+                                <col style="width: 5%;">
+                                <col style="width: 4%;">
+                                <col style="width: 5%;">
+                                <col style="width: 6%;">
+                                <col style="width: 42%;">
+                                <col style="width: 12%;">
+                            </colgroup>
+                            <thead>
+                                <tr style="background: #FFFF00;">
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">中文品名</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">DESCRIPTION</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">出货总数<br/>(pcs)</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">每箱数<br/>(pcs)</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">箱数<br/>(ctns)</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">每箱<br/>(CBM)</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">总数<br/>(CBM)</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">唛头</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap; font-size: 12px;">备注</th>
+                                    <th style="border: 1px solid #000; padding: 2px 4px; text-align: center; font-weight: bold; white-space: nowrap;">注意事项</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    // 重置每组的小计
+                    let totalBoxes = 0;
+                    let totalQty = 0;
+                    let totalVolume = 0;
+
+                    // 按备注分组，计算每组的起始行和行数
+                    const remarkGroups = [];
+                    groupOrders.forEach((order, index) => {
+                        const remark = order.remark || '';
+                        const lastGroup = remarkGroups[remarkGroups.length - 1];
+                        if (lastGroup && lastGroup.remark === remark) {
+                            lastGroup.rows.push(index);
+                        } else {
+                            remarkGroups.push({ remark, rows: [index] });
+                        }
+                    });
+
+                    groupOrders.forEach((order, index) => {
+                        // 从库存中查找产品信息（按产品名称匹配）
+                        let inventoryItem = null;
+                        const pName = (order.productName || '').toLowerCase();
+
+                        for (let item of inventory) {
+                            const invName = (item.name || '').toLowerCase();
+                            const invAlias = (item.alias || '').toLowerCase();
+
+                            // 优先按产品名称完全匹配
+                            if (invName === pName) {
+                                inventoryItem = item;
+                                break;
+                            }
+                            // 如果产品名没匹配，尝试按别名匹配（别名可能是逗号分隔的多值）
+                            if (invAlias) {
+                                const aliasList = invAlias.split(',').map(a => a.trim().toLowerCase());
+                                if (aliasList.includes(pName)) {
+                                    inventoryItem = item;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // 获取每箱数和每箱CBM
+                        let boxQty = 0;
+                        let perBoxVolume = 0;
+
+                        if (inventoryItem) {
+                            boxQty = parseInt(inventoryItem.boxQty) || 0;
+                            perBoxVolume = parseFloat(String(inventoryItem.volume || 0)) || 0;
+                        }
+
+                        const totalCBM = order.boxes * perBoxVolume;
+
+                        totalBoxes += order.boxes;
+                        totalQty += order.quantity || 0;
+                        totalVolume += totalCBM;
+
+                        // 中文品名 = 产品标准名
+                        const productName = inventoryItem ? inventoryItem.name : order.productName;
+
+                        // 箱数格式
+                        let boxDisplay = order.boxes + '箱';
+
+                        // 计算当前行的备注信息
+                        let remarkHtml = '';
+                        let skipRemark = false;
+                        for (let i = 0; i < remarkGroups.length; i++) {
+                            const group = remarkGroups[i];
+                            if (group.rows.includes(index)) {
+                                if (group.rows[0] === index) {
+                                    // 是该组的第一行，显示备注并设置rowspan
+                                    remarkHtml = `<td style="border: 1px solid #000; padding: 2px 4px; font-size: 12px; vertical-align: top; white-space: pre-wrap;" rowspan="${group.rows.length}">${(order.remark || '').replace(/\n/g, '<br/>')}</td>`;
+                                } else {
+                                    // 不是第一行，跳过备注列
+                                    skipRemark = true;
+                                }
+                                break;
+                            }
+                        }
+
+                        if (skipRemark) {
+                            html += `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 1px 3px; white-space: nowrap;">${productName}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${order.quantity || ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${boxQty > 0 ? boxQty : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${boxDisplay}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${perBoxVolume > 0 ? perBoxVolume.toFixed(3) : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${totalCBM > 0 ? totalCBM.toFixed(3) : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px;">${inventoryItem ? (inventoryItem.remark || '') : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; font-size: 12px;">${inventoryItem ? (inventoryItem.remark1 || '') : ''}</td>
+                            </tr>
+                        `;
+                        } else {
+                            html += `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 1px 3px; white-space: nowrap;">${productName}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${order.quantity || ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${boxQty > 0 ? boxQty : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${boxDisplay}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${perBoxVolume > 0 ? perBoxVolume.toFixed(3) : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${totalCBM > 0 ? totalCBM.toFixed(3) : ''}</td>
+                                <td style="border: 1px solid #000; padding: 1px 3px;">${inventoryItem ? (inventoryItem.remark || '') : ''}</td>
+                                ${remarkHtml}
+                                <td style="border: 1px solid #000; padding: 1px 3px; font-size: 12px;">${inventoryItem ? (inventoryItem.remark1 || '') : ''}</td>
+                            </tr>
+                        `;
+                        }
+                    });
+
+                    html += `
+                                <tr style="font-weight: bold;">
+                                    <td colspan="2" style="border: 1px solid #000; padding: 1px 3px; text-align: right;">合计：</td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${totalQty}</td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${totalBoxes}</td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px; text-align: center;">${totalVolume.toFixed(3)}</td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                    <td style="border: 1px solid #000; padding: 1px 3px;"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+                
+                // 显示出货通知页面（打开新窗口）
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                    alert('请允许弹出窗口以显示出货通知');
+                    return;
+                }
+
+                // 收集订单产品名用于调试
+                const orderProductNames = selectedOrders.map(o => o.productName).join(', ');
+
+                const fullPageHtml = `
+                    <html>
+                    <head>
+                        <title>出货通知</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; padding: 0; }
+                            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                            th { border: 1px solid #000; padding: 5px; text-align: center; font-weight: bold; }
+                            td { border: 1px solid #000; padding: 5px; }
+                            .debug-info { background: #ffffcc; padding: 10px; margin: 10px 0; font-size: 11px; border: 1px solid #999; }
+                        </style>
+                    </head>
+                    <body>
+                        <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+                            ${html}
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                printWindow.document.write(fullPageHtml);
+                printWindow.document.close();
+                
+            } catch (error) {
+                console.error('生成出货通知失败:', error);
+                alert('生成出货通知失败：' + error.message);
+            }
+        }
+        
+        function callHuolala() {
+            const selected = document.querySelectorAll('.row-checkbox:checked');
+            if (selected.length === 0) {
+                alert('请先选择要叫车的订单');
+                return;
+            }
+            
+            const customer = document.getElementById('customerSelect').value;
+            if (!customer) {
+                alert('请先选择客户');
+                return;
+            }
+            
+            window.open('https://www.huolala.cn/', '_blank');
+        }
+        
+
+        // ============ 库存看板 ============
+        // 计算某个产品在所有出货记录中的总已发个数
+        function getShippedQty(productName) {
+            var total = 0;
+            reconRecords.forEach(function(r) {
+                if (r.productName === productName) {
+                    total += parseInt(r.quantity) || 0;
+                }
+            });
+            return total;
+        }
+
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = '';
+
+            inventory.forEach((item, index) => {
+                const tr = document.createElement('tr');
+
+                // 按列顺序：产品名称, 别名, 每箱数, 装盒数量, 每箱CBM, 盘点数量, 总箱数, 剩余个数, 出货备注, 备注1
+                const beforeRemaining = ['name', 'alias', 'boxQty', 'boxCount', 'volume', 'checkQty', 'totalBoxes'];
+                const afterRemaining = ['remark', 'remark1'];
+
+                beforeRemaining.forEach(field => {
+                    const td = document.createElement('td');
+                    td.textContent = item[field] || '';
+                    tr.appendChild(td);
+                });
+
+                // 剩余个数 = 盘点数量 - 已出货总个数
+                const checkQty = parseInt(item.checkQty) || 0;
+                const shippedQty = getShippedQty(item.name);
+                const remainingQty = Math.max(0, checkQty - shippedQty);
+                const tdRemaining = document.createElement('td');
+                tdRemaining.textContent = remainingQty;
+                tr.appendChild(tdRemaining);
+
+                afterRemaining.forEach(field => {
+                    const td = document.createElement('td');
+                    td.textContent = item[field] || '';
+                    tr.appendChild(td);
+                });
+
+                // 添加操作列
+                const td = document.createElement('td');
+                td.innerHTML = `
+                    <button class="btn" data-btn="edit-product" style="padding: 4px 12px; font-size: 12px;" onclick="editProduct('${item._id}')">编辑</button>
+                    <button class="btn" data-btn="delete-product" style="padding: 4px 12px; font-size: 12px;" onclick="deleteProduct('${item._id}')">删除</button>
+                `;
+                tr.appendChild(td);
+
+                tbody.appendChild(tr);
+            });
+
+            updateInventoryStats();
+            applyButtonColors();
+        }
+        
+        function updateInventoryStats() {
+            // 计算剩余箱数（按优先级）
+            inventory.forEach(item => {
+                let remainingBoxes = 0;
+
+                // 优先级1：如果有盘点数量 且 有装箱数
+                if (item.checkQty && parseInt(item.checkQty) > 0 && item.boxQty && parseInt(item.boxQty) > 0) {
+                    remainingBoxes = Math.floor(parseInt(item.checkQty) / parseInt(item.boxQty));
+                }
+                // 优先级2：初始总箱数 - 已发货箱数
+                else if (item.totalBoxes) {
+                    const initialBoxes = parseInt(item.totalBoxes) || 0;
+                    // 从发货记录统计已发货箱数（这里暂时用简单实现，后续需要连接数据库）
+                    const shippedBoxes = 0; // TODO: 从 _daily_records 统计
+                    remainingBoxes = initialBoxes - shippedBoxes;
+                    if (remainingBoxes < 0) remainingBoxes = 0;
+                }
+
+                item.remainingBoxes = remainingBoxes;
+            });
+
+            const totalBoxes = inventory.reduce((sum, item) => sum + (parseInt(item.remainingBoxes) || 0), 0);
+
+            document.getElementById('inventoryCount').textContent = inventory.length;
+            document.getElementById('inventoryTotalBoxes').textContent = totalBoxes;
+        }
+
+        function filterInventory() {
+            const keyword = document.getElementById('inventorySearch').value.toLowerCase();
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = '';
+
+            // 搜索产品名称和别名
+            const filtered = inventory.filter(item =>
+                item.name.toLowerCase().includes(keyword) ||
+                (item.alias && item.alias.toLowerCase().includes(keyword))
+            );
+
+            filtered.forEach((item, index) => {
+                const tr = document.createElement('tr');
+
+                // 按列顺序：产品名称, 别名, 每箱数, 装盒数量, 每箱CBM, 盘点数量, 总箱数, 剩余个数, 出货备注, 备注1
+                const beforeRemaining = ['name', 'alias', 'boxQty', 'boxCount', 'volume', 'checkQty', 'totalBoxes'];
+                const afterRemaining = ['remark', 'remark1'];
+
+                beforeRemaining.forEach(field => {
+                    const td = document.createElement('td');
+                    td.textContent = item[field] || '';
+                    tr.appendChild(td);
+                });
+
+                // 剩余个数 = 盘点数量 - 已出货总个数
+                const checkQty = parseInt(item.checkQty) || 0;
+                const shippedQty = getShippedQty(item.name);
+                const remainingQty = Math.max(0, checkQty - shippedQty);
+                const tdRemaining = document.createElement('td');
+                tdRemaining.textContent = remainingQty;
+                tr.appendChild(tdRemaining);
+
+                afterRemaining.forEach(field => {
+                    const td = document.createElement('td');
+                    td.textContent = item[field] || '';
+                    tr.appendChild(td);
+                });
+
+                // 添加操作列
+                const td = document.createElement('td');
+                td.innerHTML = `
+                    <button class="btn" data-btn="edit-product" style="padding: 4px 12px; font-size: 12px;" onclick="editProduct('${item._id}')">编辑</button>
+                    <button class="btn" data-btn="delete-product" style="padding: 4px 12px; font-size: 12px;" onclick="deleteProduct('${item._id}')">删除</button>
+                `;
+                tr.appendChild(td);
+
+                tbody.appendChild(tr);
+            });
+
+            // 更新统计
+            const filteredTotalBoxes = filtered.reduce((sum, item) => sum + (parseInt(item.remainingBoxes) || 0), 0);
+            document.getElementById('inventoryTotalBoxes').textContent = filteredTotalBoxes;
+            applyButtonColors();
+        }
+        
+        function openAddProductModal() {
+            document.getElementById('productModalTitle').textContent = '新增产品';
+            document.getElementById('editProductId').value = '';
+            document.getElementById('productName').value = '';
+            document.getElementById('productAlias').value = '';
+            document.getElementById('productBoxQty').value = '';
+            document.getElementById('productBoxCount').value = '';
+            document.getElementById('productVolume').value = '';
+            document.getElementById('productCheckQty').value = '';
+            document.getElementById('productTotalBoxes').value = '';
+            document.getElementById('productRemark').value = '';
+            document.getElementById('productRemark').value = '';
+            document.getElementById('productRemark1').value = '';
+            document.getElementById('addProductModal').classList.add('active');
+        }
+        
+        function closeAddProductModal() {
+            document.getElementById('addProductModal').classList.remove('active');
+        }
+        
+        function editProduct(id) {
+            const item = inventory.find(p => p._id === id);
+            if (!item) return;
+
+            document.getElementById('productModalTitle').textContent = '编辑产品';
+            document.getElementById('editProductId').value = id;
+            document.getElementById('productName').value = item.name;
+            document.getElementById('productAlias').value = item.alias || '';
+            document.getElementById('productBoxQty').value = item.boxQty || '';
+            document.getElementById('productBoxCount').value = item.boxCount || '';
+            document.getElementById('productVolume').value = item.volume || '';
+            document.getElementById('productCheckQty').value = item.checkQty || '';
+            document.getElementById('productTotalBoxes').value = item.totalBoxes || '';
+            document.getElementById('productRemark').value = item.remark || '';
+            document.getElementById('productRemark1').value = item.remark1 || '';
+            document.getElementById('addProductModal').classList.add('active');
+        }
+        
+        async function saveProduct() {
+            const name = document.getElementById('productName').value.trim();
+            if (!name) {
+                alert('请输入产品名称');
+                return;
+            }
+
+            const editId = document.getElementById('editProductId').value;
+            const productData = {
+                _id: editId || Date.now().toString(),
+                name: name,
+                alias: document.getElementById('productAlias').value.trim(),
+                boxQty: document.getElementById('productBoxQty').value,
+                boxCount: document.getElementById('productBoxCount').value,
+                volume: document.getElementById('productVolume').value,
+                checkQty: document.getElementById('productCheckQty').value,
+                totalBoxes: document.getElementById('productTotalBoxes').value,
+                remark: document.getElementById('productRemark').value.trim(),
+                remark1: document.getElementById('productRemark1').value.trim(),
+                note: '' // 注意事项字段
+            };
+            
+            if (editId) {
+                const index = inventory.findIndex(p => p._id === editId);
+                if (index !== -1) {
+                    inventory[index] = productData;
+                }
+                if (cloudConnected) {
+                    await saveToCloud('inventory', productData, 'update');
+                }
+            } else {
+                if (inventory.some(p => p.name === name)) {
+                    alert('该产品已存在');
+                    return;
+                }
+                inventory.push(productData);
+                if (cloudConnected) {
+                    await saveToCloud('inventory', productData, 'add');
+                }
+            }
+            
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            closeAddProductModal();
+            renderInventoryTable();
+            updateInventoryStats();
+        }
+        
+        async function deleteProduct(id) {
+            if (!confirm('确定要删除该产品吗？')) return;
+            inventory = inventory.filter(p => p._id !== id);
+            
+            if (cloudConnected) {
+                await saveToCloud('inventory', { _id: id }, 'delete');
+            }
+            
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            renderInventoryTable();
+        }
+        
+        // 导入库存
+        function importInventory() {
+            document.getElementById('importFileInput').click();
+        }
+
+        // 简易CSV行解析（支持逗号分隔）
+        function parseCSVLine(line) {
+            var result = [];
+            var current = '';
+            var inQuotes = false;
+            for (var i = 0; i < line.length; i++) {
+                var ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+                    else if (ch === '"') { inQuotes = false; }
+                    else { current += ch; }
+                } else {
+                    if (ch === '"') { inQuotes = true; }
+                    else if (ch === ',') { result.push(current.trim()); current = ''; }
+                    else { current += ch; }
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+        
+        async function handleFileImport(file) {
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    let jsonData = [];
+                    var fileName = file.name.toLowerCase();
+
+                    if (fileName.endsWith('.csv')) {
+                        // CSV 解析
+                        var text = new TextDecoder('utf-8').decode(e.target.result);
+                        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // 去BOM
+                        var lines = text.split(/\r?\n/);
+                        lines.forEach(function(line) {
+                            if (line.trim()) jsonData.push(parseCSVLine(line));
+                        });
+                    } else {
+                        // Excel 解析
+                        const buffer = e.target.result;
+                        const workbook = new ExcelJS.Workbook();
+                        await workbook.xlsx.load(buffer);
+                        const sheet = workbook.worksheets[0];
+                        sheet.eachRow({ includeEmpty: false }, function(row) {
+                            var values = row.values;
+                            var arr = [];
+                            for (var c = 1; c < values.length; c++) {
+                                arr.push(values[c] != null ? values[c] : '');
+                            }
+                            jsonData.push(arr);
+                        });
+                    }
+
+                    if (jsonData.length < 2) {
+                        alert('文件内容为空');
+                        return;
+                    }
+
+                    // 根据表头自动匹配列位置
+                    var headers = jsonData[0].map(function(h) { return String(h).trim(); });
+                    var colMap = {};
+                    headers.forEach(function(h, idx) { colMap[h] = idx; });
+
+                    console.log('导入表头:', JSON.stringify(headers));
+                    console.log('列映射:', JSON.stringify(colMap));
+                    console.log('数据行数:', jsonData.length - 1);
+
+                    function getCol(row, names) {
+                        for (var n = 0; n < names.length; n++) {
+                            if (colMap[names[n]] !== undefined) return String(row[colMap[names[n]]] || '').trim();
+                        }
+                        return '';
+                    }
+
+                    let importCount = 0;
+                    const newItems = [];
+
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row[0] && !getCol(row, ['产品名称'])) continue;
+
+                        const product = {
+                            _id: Date.now().toString() + i,
+                            name: getCol(row, ['产品名称']),
+                            alias: getCol(row, ['别名/关键词', '别名']),
+                            boxQty: getCol(row, ['每箱数']),
+                            boxCount: getCol(row, ['装盒数量']),
+                            volume: getCol(row, ['每箱CBM']),
+                            checkQty: getCol(row, ['盘点数量']),
+                            totalBoxes: getCol(row, ['总箱数']),
+                            remark: getCol(row, ['出货备注', '备注']),
+                            remark1: getCol(row, ['备注1']),
+                            _rawData: row
+                        };
+
+                        if (!inventory.some(p => p.name === product.name)) {
+                            inventory.push(product);
+                            newItems.push(product);
+                            importCount++;
+                        }
+                    }
+                    
+                    // 云端批量保存
+                    if (cloudConnected && newItems.length > 0) {
+                        await saveToCloud('inventory', newItems, 'add');
+                    }
+                    
+                    localStorage.setItem('inventory', JSON.stringify(inventory));
+                    renderInventoryTable();
+                    alert('导入成功！共导入 ' + importCount + ' 条数据');
+                } catch (err) {
+                    alert('导入失败：' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // 导出库存
+        function exportInventory() {
+            if (inventory.length === 0) {
+                alert('没有产品可导出');
+                return;
+            }
+
+            // 固定的表头
+            const headers = '产品名称,别名/关键词,每箱数,装盒数量,每箱CBM,盘点数量,总箱数,剩余个数,出货备注,备注1';
+            let csv = '\uFEFF' + headers + '\n';
+
+            inventory.forEach(item => {
+                const checkQty = parseInt(item.checkQty) || 0;
+                const shippedQty = getShippedQty(item.name);
+                const remainingQty = Math.max(0, checkQty - shippedQty);
+                const fields = ['name', 'alias', 'boxQty', 'boxCount', 'volume', 'checkQty', 'totalBoxes', 'remark', 'remark1'];
+                const row = fields.map(field => item[field] || '');
+                row.splice(7, 0, remainingQty); // 在总箱数后插入剩余个数
+                csv += row.join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `库存清单_${new Date().toLocaleDateString('zh-CN')}.csv`;
+            link.click();
+        }
+
+        async function syncToCloud() {
+            if (!cloudConnected) {
+                alert('云端未连接，无法同步数据');
+                return;
+            }
+
+            if (!confirm('确定要将本地数据同步到云端吗？这将覆盖云端的现有数据。')) return;
+
+            const btn = document.getElementById('syncCloudBtn');
+            const originalText = btn.textContent;
+            btn.textContent = '同步中...';
+            btn.disabled = true;
+
+            try {
+                // 同步库存
+                await saveToCloud('inventory', inventory, 'set');
+
+                // 同步客户
+                const customerData = customers.map(c => ({ name: c }));
+                await saveToCloud('customers', customerData, 'set');
+
+                // 同步订单
+                await saveToCloud('orders', orders, 'set');
+
+                alert('数据已成功同步到云端！');
+                btn.style.display = 'none';
+            } catch (err) {
+                console.error('同步失败:', err);
+                alert('同步失败：' + err.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function clearInventory() {
+            if (!confirm('确定要清空所有库存数据吗？此操作不可恢复！')) return;
+            if (!confirm('再次确认：清空后所有产品数据将被删除！')) return;
+            
+            if (cloudConnected) {
+                await saveToCloud('inventory', inventory, 'set');
+            }
+
+            inventory = [];
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            renderInventoryTable();
+            updateInventoryStats();
+        }
+
+        // ============ 出货对账 ============
+        var reconFilteredRecords = [];
+
+        function populateReconCustomers() {
+            var select = document.getElementById('reconCustomerSelect');
+            var curVal = select.value;
+            select.innerHTML = '<option value="">全部客户</option>';
+            customers.forEach(function(c) {
+                var opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                select.appendChild(opt);
+            });
+            if (curVal && customers.indexOf(curVal) !== -1) {
+                select.value = curVal;
+            }
+        }
+
+        function getOrderDate(order) {
+            var t = order.time || '';
+            // toLocaleString('zh-CN') 格式: "2026/3/28 下午3:30:00" 或 "2026/3/28 15:30:00"
+            var m = t.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+            if (m) return m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
+            var d = new Date(t);
+            if (!isNaN(d.getTime())) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            return '';
+        }
+
+        function queryThisMonth() {
+            var now = new Date();
+            var start = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+            var end = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            document.getElementById('reconStartDate').value = start;
+            document.getElementById('reconEndDate').value = end;
+            queryReconciliation();
+        }
+
+        function queryReconciliation() {
+            var customer = document.getElementById('reconCustomerSelect').value;
+            var startDate = document.getElementById('reconStartDate').value;
+            var endDate = document.getElementById('reconEndDate').value;
+            var productFilter = document.getElementById('reconProductFilter').value.trim().toLowerCase();
+
+            var filtered = reconRecords.filter(function(o) {
+                // 客户匹配
+                if (customer && o.customer !== customer) return false;
+                // 日期范围
+                var orderDate = getOrderDate(o);
+                if (!orderDate) return false;
+                if (startDate && orderDate < startDate) return false;
+                if (endDate && orderDate > endDate) return false;
+                // 品名匹配
+                if (productFilter) {
+                    var match = false;
+                    if (o.productName && o.productName.toLowerCase().indexOf(productFilter) !== -1) {
+                        match = true;
+                    }
+                    if (!match) {
+                        for (var i = 0; i < inventory.length; i++) {
+                            var inv = inventory[i];
+                            var invMatch = false;
+                            if (inv.name && inv.name.toLowerCase().indexOf(productFilter) !== -1) invMatch = true;
+                            if (inv.alias && inv.alias.toLowerCase().indexOf(productFilter) !== -1) invMatch = true;
+                            if (invMatch && o.productName === inv.name) { match = true; break; }
+                            if (invMatch && inv.alias) {
+                                var aliases = inv.alias.split(/[,，]/).map(function(a) { return a.trim(); });
+                                if (aliases.indexOf(o.productName) !== -1) { match = true; break; }
+                            }
+                        }
+                    }
+                    if (!match) return false;
+                }
+                return true;
+            });
+
+            // 排序：日期升序，同日期按ID升序
+            filtered.sort(function(a, b) {
+                var da = new Date(a.time).getTime() || 0;
+                var db = new Date(b.time).getTime() || 0;
+                if (da !== db) return da - db;
+                return String(a._id).localeCompare(String(b._id));
+            });
+
+            reconFilteredRecords = filtered;
+            renderReconDetail(filtered);
+            renderReconSummary(filtered);
+        }
+
+        function renderReconDetail(records) {
+            var tbody = document.getElementById('reconDetailBody');
+            tbody.innerHTML = '';
+            document.getElementById('reconDetailCount').textContent = records.length > 0 ? ('共 ' + records.length + ' 条记录') : '';
+
+            records.forEach(function(order) {
+                var tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                var dateStr = getOrderDate(order);
+                var qtyDisplay = order.unit ? order.boxes + order.unit : order.boxes + '箱';
+                var remarkText = order.remark || '';
+                if (order.isSupplement) remarkText = '[补充]' + remarkText;
+                var displayRemark = remarkText.length > 60 ? remarkText.substring(0, 60) + '...' : remarkText;
+                var safeRemark = remarkText.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+                tr.innerHTML =
+                    '<td class="checkbox-col"><input type="checkbox" class="recon-checkbox" data-id="' + order._id + '"></td>' +
+                    '<td>' + dateStr + '</td>' +
+                    '<td>' + (order.productName || '') + '</td>' +
+                    '<td>' + qtyDisplay + '</td>' +
+                    '<td>' + (order.quantity || 0) + '</td>' +
+                    '<td title="' + safeRemark + '">' + displayRemark + '</td>';
+
+                // 点击行切换选中
+                tr.addEventListener('click', function(e) {
+                    if (e.target.type === 'checkbox') return;
+                    var cb = tr.querySelector('.recon-checkbox');
+                    cb.checked = !cb.checked;
+                    tr.classList.toggle('row-selected', cb.checked);
+                });
+
+                // checkbox 变化时同步高亮
+                tr.querySelector('.recon-checkbox').addEventListener('change', function() {
+                    tr.classList.toggle('row-selected', this.checked);
+                });
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderReconSummary(records) {
+            var tbody = document.getElementById('reconSummaryBody');
+            tbody.innerHTML = '';
+
+            var summaryMap = {};
+            records.forEach(function(order) {
+                var name = order.productName || '未识别';
+                if (!summaryMap[name]) summaryMap[name] = { boxes: 0, duan: 0, ges: 0, totalQty: 0 };
+                var unit = (order.unit || '箱').toLowerCase();
+                if (unit === '端') summaryMap[name].duan += order.boxes;
+                else if (unit === '个' || unit === '件' || unit === 'pcs') summaryMap[name].ges += order.boxes;
+                else summaryMap[name].boxes += order.boxes;
+                summaryMap[name].totalQty += order.quantity || 0;
+            });
+
+            Object.keys(summaryMap).forEach(function(name) {
+                var s = summaryMap[name];
+                var parts = [];
+                if (s.boxes > 0) parts.push(s.boxes + '箱');
+                if (s.duan > 0) parts.push(s.duan + '端');
+                if (s.ges > 0) parts.push(s.ges + '个');
+                var qtyStr = parts.length > 0 ? parts.join(' ') : '0';
+
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + name + '</td><td>' + qtyStr + '</td><td>' + s.totalQty + '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 选择操作
+        function toggleReconSelectAll() {
+            var checked = document.getElementById('reconSelectAll').checked;
+            document.querySelectorAll('.recon-checkbox').forEach(function(cb) { cb.checked = checked; });
+        }
+        function selectAllRecon() {
+            document.getElementById('reconSelectAll').checked = true;
+            document.querySelectorAll('.recon-checkbox').forEach(function(cb) { cb.checked = true; });
+        }
+        function deselectAllRecon() {
+            document.getElementById('reconSelectAll').checked = false;
+            document.querySelectorAll('.recon-checkbox').forEach(function(cb) { cb.checked = false; });
+        }
+
+        // 删除记录
+        async function deleteReconRecords() {
+            var checkboxes = document.querySelectorAll('.recon-checkbox:checked');
+            if (checkboxes.length === 0) { alert('请先选择要删除的记录'); return; }
+            if (!confirm('确定要删除选中的 ' + checkboxes.length + ' 条记录吗？')) return;
+
+            var ids = Array.from(checkboxes).map(function(cb) { return cb.dataset.id; });
+            var toDelete = reconRecords.filter(function(o) { return ids.indexOf(o._id) !== -1; });
+            reconRecords = reconRecords.filter(function(o) { return ids.indexOf(o._id) === -1; });
+
+            localStorage.setItem('reconRecords', JSON.stringify(reconRecords));
+            queryReconciliation();
+            alert('已删除 ' + toDelete.length + ' 条记录');
+        }
+
+        // 导出对账表
+        async function exportReconciliation() {
+            if (reconFilteredRecords.length === 0) { alert('没有可导出的记录，请先查询'); return; }
+
+            var records = reconFilteredRecords;
+            var customer = document.getElementById('reconCustomerSelect').value;
+            var startDate = document.getElementById('reconStartDate').value;
+            var endDate = document.getElementById('reconEndDate').value;
+
+            var dateRange = getOrderDate({ time: new Date().toLocaleString() });
+            if (startDate && endDate) dateRange = startDate + '_' + endDate;
+            else if (startDate) dateRange = startDate + '_至今';
+            else if (endDate) dateRange = '至' + endDate;
+
+            var fileName = '出货对账';
+            if (customer) fileName += '_' + customer;
+            fileName += '_' + dateRange + '.xlsx';
+
+            var workbook = new ExcelJS.Workbook();
+            workbook.creator = '线上发单系统';
+
+            var thinBorder = {
+                top: { style: 'thin', color: { argb: 'FF4F81BD' } },
+                bottom: { style: 'thin', color: { argb: 'FF4F81BD' } },
+                left: { style: 'thin', color: { argb: 'FF4F81BD' } },
+                right: { style: 'thin', color: { argb: 'FF4F81BD' } }
+            };
+
+            // ===== Sheet1: 出货明细 =====
+            var sheet1 = workbook.addWorksheet('出货明细');
+            sheet1.columns = [
+                { width: 12 }, { width: 18 }, { width: 8 }, { width: 10 },
+                { width: 40 }, { width: 40 }
+            ];
+
+            var titleText = '出货明细';
+            if (startDate || endDate) titleText += ' ' + (startDate || '') + '~' + (endDate || '');
+
+            var titleRow = sheet1.addRow([titleText]);
+            titleRow.height = 28;
+            sheet1.mergeCells('A1:F1');
+            titleRow.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            var headerRow = sheet1.addRow(['日期', '品名', '数量(箱/端/个)', '总个数', '备注', '备注1']);
+            headerRow.height = 22;
+            headerRow.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } };
+                cell.font = { bold: true, color: { argb: 'FF1F4E79' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            records.forEach(function(order, index) {
+                var dateStr = getOrderDate(order);
+                var qtyStr = order.unit ? order.boxes + order.unit : order.boxes + '箱';
+                var remarkText = order.remark || '';
+                if (order.isSupplement) remarkText = '[补充]' + remarkText;
+                var bgColor = index % 2 === 1 ? 'FFDEEAF6' : 'FFFFFFFF';
+
+                var row = sheet1.addRow([dateStr, order.productName || '', qtyStr, order.quantity || 0, remarkText, order.remark1 || '']);
+                row.height = 18;
+                row.eachCell({ includeEmpty: true }, function(cell, colNumber) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+                    cell.font = { size: 9 };
+                    cell.border = thinBorder;
+                    if (colNumber === 2 || colNumber === 5 || colNumber === 6) {
+                        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                    } else {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+                });
+            });
+
+            // ===== Sheet2: 按产品汇总 =====
+            var summaryMap = {};
+            records.forEach(function(order) {
+                var name = order.productName || '未识别';
+                if (!summaryMap[name]) summaryMap[name] = { boxes: 0, duan: 0, ges: 0, totalQty: 0 };
+                var unit = (order.unit || '箱').toLowerCase();
+                if (unit === '端') summaryMap[name].duan += order.boxes;
+                else if (unit === '个' || unit === '件' || unit === 'pcs') summaryMap[name].ges += order.boxes;
+                else summaryMap[name].boxes += order.boxes;
+                summaryMap[name].totalQty += order.quantity || 0;
+            });
+
+            var sheet2 = workbook.addWorksheet('按产品汇总');
+            sheet2.columns = [{ width: 24 }, { width: 18 }, { width: 14 }];
+
+            var h2 = sheet2.addRow(['品名', '数量(箱/端/个)', '总个数(pcs)']);
+            h2.height = 22;
+            h2.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } };
+                cell.font = { bold: true, color: { argb: 'FF1F4E79' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            var rowIdx2 = 0;
+            Object.keys(summaryMap).forEach(function(name) {
+                var s = summaryMap[name];
+                var parts = [];
+                if (s.boxes > 0) parts.push(s.boxes + '箱');
+                if (s.duan > 0) parts.push(s.duan + '端');
+                if (s.ges > 0) parts.push(s.ges + '个');
+                var qtyStr = parts.length > 0 ? parts.join(' ') : '0';
+                var bg2 = rowIdx2 % 2 === 0 ? 'FFDEEAF6' : 'FFFFFFFF';
+
+                var row = sheet2.addRow([name, qtyStr, s.totalQty]);
+                row.eachCell(function(cell, colNumber) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg2 } };
+                    cell.font = { size: 10 };
+                    cell.border = thinBorder;
+                    cell.alignment = { horizontal: colNumber === 1 ? 'left' : 'center', vertical: 'middle' };
+                });
+                rowIdx2++;
+            });
+
+            // ===== Sheet3: 仓库对账 =====
+            var sheet3 = workbook.addWorksheet('仓库对账');
+            sheet3.columns = [{ width: 24 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }];
+
+            var h3 = sheet3.addRow(['产品名称', '初始总箱数', '本期已出箱数', '本期已出端数', '当前剩余箱数']);
+            h3.height = 22;
+            h3.eachCell(function(cell) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } };
+                cell.font = { bold: true, color: { argb: 'FF1F4E79' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            // 合并库存数据和本期出库数据
+            var reconProducts = {};
+            inventory.forEach(function(inv) {
+                var tb = parseInt(inv.totalBoxes) || 0;
+                if (tb > 0) {
+                    reconProducts[inv.name] = { totalBoxes: tb, shippedBoxes: 0, shippedDuan: 0 };
+                }
+            });
+            Object.keys(summaryMap).forEach(function(name) {
+                if (!reconProducts[name]) {
+                    reconProducts[name] = { totalBoxes: 0, shippedBoxes: 0, shippedDuan: 0 };
+                }
+                reconProducts[name].shippedBoxes += summaryMap[name].boxes;
+                reconProducts[name].shippedDuan += summaryMap[name].duan;
+            });
+
+            var rowIdx3 = 0;
+            Object.keys(reconProducts).forEach(function(name) {
+                var rp = reconProducts[name];
+                var remaining = rp.totalBoxes - rp.shippedBoxes;
+                if (remaining < 0) remaining = 0;
+                var bg3 = rowIdx3 % 2 === 0 ? 'FFDEEAF6' : 'FFFFFFFF';
+
+                var row = sheet3.addRow([name, rp.totalBoxes, rp.shippedBoxes, rp.shippedDuan, remaining]);
+                row.eachCell(function(cell, colNumber) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg3 } };
+                    cell.font = { size: 10 };
+                    cell.border = thinBorder;
+                    cell.alignment = { horizontal: colNumber === 1 ? 'left' : 'center', vertical: 'middle' };
+                });
+                rowIdx3++;
+            });
+
+            // 保存
+            var buffer = await workbook.xlsx.writeBuffer();
+            var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+
+            alert('导出成功！');
+        }
+
+        // ===== 补充记录 =====
+        function openSupplementModal() {
+            var select = document.getElementById('supplementCustomer');
+            select.innerHTML = '<option value="">请选择客户</option>';
+            customers.forEach(function(c) {
+                var opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                select.appendChild(opt);
+            });
+            if (customers.indexOf('大漂亮') !== -1) select.value = '大漂亮';
+
+            var today = new Date();
+            document.getElementById('supplementDate').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            document.getElementById('supplementContent').value = '';
+            document.getElementById('supplementModal').classList.add('active');
+        }
+
+        function closeSupplementModal() {
+            document.getElementById('supplementModal').classList.remove('active');
+        }
+
+        async function saveSupplement() {
+            var customer = document.getElementById('supplementCustomer').value;
+            var dateStr = document.getElementById('supplementDate').value;
+            var content = document.getElementById('supplementContent').value.trim();
+
+            if (!customer) { alert('请选择客户'); return; }
+            if (!dateStr) { alert('请选择出货日期'); return; }
+            if (!content) { alert('请粘贴聊天内容'); return; }
+
+            var cleanContent = content.replace(/^\/+|\/+$/g, '').trim();
+            var products = [];
+            var unitPattern = /(\d+|[一二三四五六七八九十百]+)\s*(箱|个|件|盒|端|ctn|ctns|pcs)/gi;
+            var match;
+
+            while ((match = unitPattern.exec(cleanContent)) !== null) {
+                var numStr = match[1];
+                var unit = match[2].toLowerCase();
+                var boxes = parseNumber(numStr);
+                var matchStart = match.index;
+                var matchEnd = match.index + match[0].length;
+                var contextBefore = cleanContent.substring(Math.max(0, matchStart - 18), matchStart);
+                var contextAfter = cleanContent.substring(matchEnd, Math.min(cleanContent.length, matchEnd + 18));
+
+                var nextMatch = unitPattern.exec(cleanContent);
+                unitPattern.lastIndex = matchEnd;
+                var endPos = nextMatch ? nextMatch.index : cleanContent.length;
+
+                var fragment = '';
+                if (contextBefore) {
+                    var parts = contextBefore.split(/[\n,，]/);
+                    fragment = parts[parts.length - 1].trim();
+                }
+                if (!fragment) {
+                    fragment = cleanContent.substring(matchEnd, endPos).trim();
+                }
+
+                var sepIndex = fragment.search(/[➕&，、\n]/);
+                if (sepIndex !== -1) fragment = fragment.substring(0, sepIndex);
+                if (fragment.length > 30) fragment = fragment.substring(0, 30);
+
+                var foundProduct = matchProduct(fragment, contextBefore, contextAfter);
+                var finalProductName = foundProduct ? foundProduct.name : (fragment || '未识别');
+                var calcResult = calculate(unit, boxes, foundProduct);
+
+                products.push({
+                    name: finalProductName,
+                    boxes: boxes,
+                    quantity: calcResult.totalQty,
+                    volume: calcResult.totalVolume,
+                    unit: unit === 'ctn' ? '箱' : unit,
+                    foundInInventory: foundProduct !== null
+                });
+            }
+
+            if (products.length === 0) {
+                alert('未能识别货物信息，请检查格式');
+                return;
+            }
+
+            // 使用自定义日期创建时间字符串
+            var customTime = new Date(dateStr + 'T12:00:00').toLocaleString('zh-CN');
+
+            products.forEach(function(p, index) {
+                var order = {
+                    _id: Date.now().toString() + 'S' + index,
+                    customer: customer,
+                    productName: p.name,
+                    boxes: p.boxes,
+                    quantity: p.quantity,
+                    volume: p.volume,
+                    unit: p.unit,
+                    remark: cleanContent,
+                    remark1: p.foundInInventory ? '' : '⚠️未匹配到库存',
+                    time: customTime,
+                    isSupplement: true,
+                    deducted: true
+                };
+                orders.push(order);
+                reconRecords.push(JSON.parse(JSON.stringify(order)));
+                if (cloudConnected) {
+                    saveToCloud('orders', order, 'add');
+                }
+            });
+
+            localStorage.setItem('orders', JSON.stringify(orders));
+            localStorage.setItem('reconRecords', JSON.stringify(reconRecords));
+            closeSupplementModal();
+            queryReconciliation();
+            renderTable();
+            updateStats();
+
+            alert('补充记录保存成功！共 ' + products.length + ' 条');
+        }
+    </script>
+
+    <!-- 按钮颜色编辑面板 -->
+    <button class="color-panel-toggle" onclick="toggleColorPanel()" title="按钮颜色编辑">🎨</button>
+    <div class="color-panel" id="colorPanel">
+        <div class="color-panel-header">
+            <h3>🎨 按钮颜色编辑</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn" style="padding:4px 10px;font-size:12px;background:#ff4d4f;color:#fff;border:none;border-radius:4px;cursor:pointer;" onclick="resetButtonColors()">恢复默认</button>
+                <button class="color-panel-close" onclick="toggleColorPanel()">✕</button>
+            </div>
+        </div>
+        <div class="color-panel-body" id="colorPanelBody"></div>
+    </div>
+</body>
+</html>
