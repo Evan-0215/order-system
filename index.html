@@ -790,6 +790,10 @@
                 app = cloudbase.init({
                     env: ENV_ID
                 });
+                
+                // 匿名登录
+                await app.auth().anonymousAuthProvider().signIn();
+                
                 db = app.database();
                 cloudConnected = true;
                 console.log('云端连接成功');
